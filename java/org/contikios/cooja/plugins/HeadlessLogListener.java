@@ -1,8 +1,11 @@
 package org.contikios.cooja.plugins;
 
-import org.contikios.cooja.*;
+import org.contikios.cooja.GUI;
+import org.contikios.cooja.Plugin;
+import org.contikios.cooja.PluginType;
 import org.contikios.cooja.SimEventCentral.LogOutputEvent;
 import org.contikios.cooja.SimEventCentral.LogOutputListener;
+import org.contikios.cooja.Simulation;
 import org.jdom2.Element;
 
 import javax.swing.*;
@@ -11,57 +14,63 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 
-@PluginType(PluginType.PType.SIM_CONTROL_PLUGIN)
+@PluginType(PluginType.PType.SIM_PLUGIN)
 public class HeadlessLogListener implements Plugin {
 
-    private final Simulation simulation;
-    private final LogOutputListener logListener;
+  private final Simulation simulation;
+  private final LogOutputListener listener;
 
-    public HeadlessLogListener(Simulation simulation, Cooja gui) {
-        this.simulation = simulation;
+  public HeadlessLogListener(Simulation simulation, GUI gui) {
+    this.simulation = simulation;
 
-        // Define how we handle log output
-        logListener = new LogOutputListener() {
-            @Override
-            public void newLogOutput(LogOutputEvent ev) {
-                String time = formatTimestamp(simulation.getSimulationTimeMillis());
-                String message = ev.getMessage();
-                int moteID = ev.getMote().getID();
-                System.out.println(time + " [Mote " + moteID + "]: " + message);
-            }
-        };
+    // IMPORTANT: use the correct method name for your COOJA version: newLogOutput(...)
+    listener = new LogOutputListener() {
+      @Override
+      public void newLogOutput(LogOutputEvent ev) {
+        // Match LogListener’s “formatted time” style.
+        String ts = formatSimTime(simulation.getSimulationTimeMillis());
+        int id = ev.getMote().getID();
+        String msg = ev.getMessage();
+        // Print to stdout (no files, as requested)
+        System.out.println(ts + "\tID:" + id + "\t" + msg);
+      }
+    };
 
-        // Register the listener with COOJA
-        simulation.getEventCentral().addLogOutputListener(logListener);
-    }
+    // Subscribe to mote logs
+    simulation.getEventCentral().addLogOutputListener(listener);
+  }
 
-    @Override
-    public void startPlugin() {
-        // No startup behavior needed
-    }
+  @Override
+  public void startPlugin() {
+    // nothing
+  }
 
-    @Override
-    public void closePlugin() {
-        // Unregister the listener on plugin close
-        simulation.getEventCentral().removeLogOutputListener(logListener);
-    }
+  @Override
+  public void closePlugin() {
+    simulation.getEventCentral().removeLogOutputListener(listener);
+  }
 
-    @Override
-    public JInternalFrame getCooja() {
-        return null; // No GUI
-    }
+  @Override
+  public JInternalFrame getCooja() {
+    return null; // no GUI
+  }
 
-    @Override
-    public Collection<Element> getConfigXML() {
-        return Collections.emptyList(); // No config
-    }
+  @Override
+  public Collection<Element> getConfigXML() {
+    return Collections.emptyList(); // no config
+  }
 
-    @Override
-    public boolean setConfigXML(Collection<Element> configXML, boolean visAvailable) {
-        return true; // No config needed
-    }
+  @Override
+  public boolean setConfigXML(Collection<Element> configXML, boolean visAvailable) {
+    return true; // no config
+  }
 
-    private String formatTimestamp(long simMillis) {
-        return "[" + new SimpleDateFormat("HH:mm:ss.SSS").format(new Date(simMillis)) + "]";
-    }
+  private static String formatSimTime(long ms) {
+    long h = ms / 3_600_000L;
+    long m = (ms / 60_000L) % 60;
+    long s = (ms / 1000L) % 60;
+    long milli = ms % 1000L;
+    if (h > 0) return String.format("%d:%02d:%02d.%03d", h, m, s, milli);
+    return String.format("%02d:%02d.%03d", m, s, milli);
+  }
 }
